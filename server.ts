@@ -143,8 +143,8 @@ function detectOrderIntent(customerNumber: string, userText: string, botReply: s
   }
 }
 
-// Función auxiliar para enviar mensaje de vuelta por WhatsApp
-async function sendWhatsAppMessage(to: string, text: string): Promise<{ success: boolean; data?: any; error?: string }> {
+// Función auxiliar para enviar mensaje de vuelta por WhatsApp (compatible con número de teléfono tradicional o BSUID)
+async function sendWhatsAppMessage(target: { phone?: string; bsuid?: string }, text: string): Promise<{ success: boolean; data?: any; error?: string }> {
   if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
     const warningMsg = 'Faltan WHATSAPP_TOKEN o PHONE_NUMBER_ID en las variables de entorno. El bot responderá en modo simulador.';
     console.warn('⚠️ ' + warningMsg);
@@ -153,16 +153,26 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<{ success:
 
   const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
 
+  // Según la documentación oficial de Meta (Sep 2026):
+  // Si hay número de teléfono se usa "to". Si es un usuario con username/BSUID se usa "recipient".
+  const payload: Record<string, any> = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    type: 'text',
+    text: { body: text },
+  };
+
+  if (target.phone) {
+    payload.to = target.phone;
+  }
+  if (target.bsuid) {
+    payload.recipient = target.bsuid;
+  }
+
   try {
     const res = await axios.post(
       url,
-      {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: to,
-        type: 'text',
-        text: { body: text },
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
@@ -171,7 +181,8 @@ async function sendWhatsAppMessage(to: string, text: string): Promise<{ success:
       }
     );
 
-    console.log(`📤 Respuesta enviada a WhatsApp Cloud API a ${to}`);
+    const recipientId = target.phone || target.bsuid || 'desconocido';
+    console.log(`📤 Respuesta enviada a WhatsApp Cloud API a ${recipientId}`);
     return { success: true, data: res.data };
   } catch (error: any) {
     const errMsg = error.response?.data?.error?.message || error.message || 'Error en WhatsApp API';
@@ -251,20 +262,22 @@ app.post('/webhook', async (req: Request, res: Response) => {
   metrics.totalIncoming++;
 
   try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const value = changes?.value;
+    // Soporta tanto el formato de producción (entry[0].changes[0].value) como el formato de prueba de Meta (req.body.value)
+    const value = req.body.entry?.[0]?.changes?.[0]?.value || req.body.value || req.body;
     const message = value?.messages?.[0];
 
     // Ignorar notificaciones de estado (entregado, leído) o mensajes que no sean texto
     if (!message || message.type !== 'text') {
+      console.log('ℹ️ Evento recibido sin mensaje de texto (status update o formato no compatible).');
       return;
     }
 
-    const fromNumber = message.from; // Número del cliente
+    const fromNumber = message.from; // Número del cliente (si está disponible)
+    const fromUserId = message.from_user_id || value?.contacts?.[0]?.user_id; // BSUID oficial de Meta (Sep 2026)
+    const customerIdentifier = fromNumber || fromUserId || 'Usuario WhatsApp';
     const incomingText = message.text.body; // Mensaje enviado por el cliente
 
-    console.log(`📩 Mensaje de ${fromNumber}: "${incomingText}"`);
+    console.log(`📩 Mensaje de ${customerIdentifier} (Phone: ${fromNumber || 'N/A'}, BSUID: ${fromUserId || 'N/A'}): "${incomingText}"`);
 
     // Consultar a Gemini usando Google GenAI SDK con fallback
     let replyText = '¡Hola! En un momento te atendemos en Postreland 🍰.';
@@ -282,13 +295,13 @@ app.post('/webhook', async (req: Request, res: Response) => {
 
     metrics.totalReplies++;
 
-    // Intentar enviar respuesta a WhatsApp Cloud API
-    const sendResult = await sendWhatsAppMessage(fromNumber, replyText);
+    // Intentar enviar respuesta a WhatsApp Cloud API (usando teléfono o BSUID)
+    const sendResult = await sendWhatsAppMessage({ phone: fromNumber, bsuid: fromUserId }, replyText);
 
     // Guardar en logs y registrar pedido potencial
     addLog({
       type: 'incoming_webhook',
-      from: fromNumber,
+      from: customerIdentifier,
       message: incomingText,
       reply: replyText,
       status: sendResult.success ? 'delivered' : 'simulated',
@@ -298,7 +311,7 @@ app.post('/webhook', async (req: Request, res: Response) => {
         : `Simulado (Sin token activo en Meta): ${sendResult.error || 'Listo para conectar'}`,
     });
 
-    detectOrderIntent(fromNumber, incomingText, replyText);
+    detectOrderIntent(customerIdentifier, incomingText, replyText);
   } catch (error: any) {
     console.error('Error procesando webhook:', error.response?.data || error.message);
     addLog({
@@ -536,6 +549,10 @@ async function startServer() {
       app.use(express.static(distPath));
       app.get('*', (_req: Request, res: Response) => {
         res.sendFile(path.resolve(distPath, 'index.html'));
+      });
+    } else {
+      app.get('/', (_req: Request, res: Response) => {
+        res.send('🍰 Postreland WhatsApp Bot Server está activo y escuchando en /webhook.');
       });
     }
   }
