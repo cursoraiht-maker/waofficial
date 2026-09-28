@@ -136,7 +136,7 @@ export const MetaSetupGuide: React.FC<MetaSetupGuideProps> = ({
         </div>
 
         {/* Credentials Status info */}
-        <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs mb-6">
           <div className="flex items-center gap-2 text-emerald-900">
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
@@ -145,9 +145,75 @@ export const MetaSetupGuide: React.FC<MetaSetupGuideProps> = ({
                 <span className="text-emerald-700 font-semibold">Credenciales configuradas (Producción activa)</span>
               ) : (
                 <span className="text-amber-800">
-                  Modo Simulador y Webhook Activo. Para despachar mensajes reales por WhatsApp hacia números de clientes, define <code>WHATSAPP_TOKEN</code> y <code>PHONE_NUMBER_ID</code> en tus variables de entorno.
+                  Modo Simulador y Webhook Activo. Para despachar mensajes reales por WhatsApp hacia números de clientes, define <code>WHATSAPP_TOKEN</code> y <code>PHONE_NUMBER_ID</code>.
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Guide: How to get WHATSAPP_TOKEN and PHONE_NUMBER_ID */}
+        <div className="border border-stone-200 rounded-2xl p-5 bg-stone-50/60 space-y-4">
+          <div className="flex items-center gap-2 text-stone-900 font-bold text-sm">
+            <Key className="w-4 h-4 text-emerald-600" />
+            <h3>¿Dónde conseguir WHATSAPP_TOKEN y PHONE_NUMBER_ID en Meta?</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Opción 1: Token Temporal */}
+            <div className="bg-white p-4 rounded-xl border border-stone-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-stone-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  Opción 1: Token Temporal (24 Horas)
+                </span>
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">
+                  Pruebas Rápidas
+                </span>
+              </div>
+              <p className="text-stone-600 text-[11px] leading-relaxed">
+                Ideal para probar envíos reales de inmediato sin configurar un usuario de sistema:
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-stone-700 text-[11px] pl-1">
+                <li>Ve a <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-medium">Meta for Developers</a> y abre tu app.</li>
+                <li>En el panel izquierdo, ve a <strong>WhatsApp &gt; Primeros pasos (Quickstart)</strong>.</li>
+                <li>En la sección <em>Paso 1: Seleccionar números de teléfono</em>:
+                  <ul className="list-disc list-inside pl-3 pt-1 text-stone-600 space-y-0.5">
+                    <li>Verás el campo <strong>Identificador de número de teléfono (PHONE_NUMBER_ID)</strong>. Cópialo.</li>
+                    <li>Arriba verás <strong>Token de acceso temporal</strong> (empieza con <code>EAA...</code>). Ese es tu <code>WHATSAPP_TOKEN</code>.</li>
+                  </ul>
+                </li>
+                <li>Agrega tu propio número de teléfono personal en <em>Para (To)</em> para autorizar recibir mensajes en modo prueba.</li>
+              </ol>
+            </div>
+
+            {/* Opción 2: Token Permanente */}
+            <div className="bg-white p-4 rounded-xl border border-stone-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-stone-900 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  Opción 2: Token Permanente (Producción)
+                </span>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                  Recomendado
+                </span>
+              </div>
+              <p className="text-stone-600 text-[11px] leading-relaxed">
+                Para que el bot de Postreland funcione siempre sin que el token caduque:
+              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-stone-700 text-[11px] pl-1">
+                <li>Ve a <a href="https://business.facebook.com/settings" target="_blank" rel="noreferrer" className="text-emerald-700 underline font-medium">Meta Business Suite &gt; Configuración del negocio</a>.</li>
+                <li>En el menú lateral, ve a <strong>Usuarios &gt; Usuarios del sistema</strong>.</li>
+                <li>Crea un nuevo usuario del sistema con rol <strong>Administrador</strong>.</li>
+                <li>Haz clic en <strong>Agregar activos</strong> y asígnale tu cuenta de WhatsApp Business y tu App con control total.</li>
+                <li>Haz clic en <strong>Generar nuevo token</strong>, selecciona tu aplicación, elige caducidad <strong>Nunca (Never)</strong> y marca los permisos:
+                  <div className="mt-1 flex flex-wrap gap-1 font-mono text-[10px]">
+                    <span className="bg-stone-100 text-emerald-800 px-1.5 py-0.5 rounded border border-stone-200">whatsapp_business_messaging</span>
+                    <span className="bg-stone-100 text-emerald-800 px-1.5 py-0.5 rounded border border-stone-200">whatsapp_business_management</span>
+                  </div>
+                </li>
+                <li>Copia ese token generado: no caducará nunca y es tu <code>WHATSAPP_TOKEN</code> definitivo.</li>
+              </ol>
             </div>
           </div>
         </div>
